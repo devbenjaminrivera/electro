@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Sobrecargas Electricas - SEC RIC Nº 10</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <h1 class="titulo-proyecto">Simulador de Sobrecargas Electricas</h1>
+            <span class="subtitulo">Instalaciones residenciales y pequenos talleres • 220 V / 50 Hz • SEC RIC Nº 10</span>
+        </div>
+        <div class="header-center">
+            <div class="selector-escenarios">
+                <label for="sel-escenario">Escenario:</label>
+                <select id="sel-escenario" title="Cargar escenario predefinido">
+                    <option value="">— Personalizado —</option>
+                </select>
+                <button id="btn-cargar-escenario" class="btn btn-secundario" disabled>Cargar</button>
+            </div>
+        </div>
+        <div class="header-right">
+            <button id="btn-nueva-rama" class="btn btn-principal" title="Agregar nueva rama al tablero">+ Nueva Rama</button>
+            <button id="btn-formulas" class="btn btn-secundario" title="Ver formulas y calculo paso a paso">Formulas</button>
+            <button id="btn-imprimir" class="btn btn-secundario" title="Imprimir / Guardar reporte en PDF (Ctrl+P)">Imprimir</button>
+            <button id="btn-reiniciar" class="btn btn-peligro" title="Reiniciar simulador a estado inicial">Reiniciar</button>
+        </div>
+    </header>
+
+    <section class="barra-parametros" aria-label="Parametros generales de la instalacion">
+        <div class="parametros-generales">
+            <h2>Parametros Generales</h2>
+            <div class="parametros-grid">
+                <div class="campo">
+                    <label for="inp-voltaje">Voltaje Fuente (V)</label>
+                    <input type="number" id="inp-voltaje" value="220" min="110" max="380" step="1">
+                </div>
+                <div class="campo">
+                    <label for="inp-automatico-general">Automatico General (A)</label>
+                    <select id="inp-automatico-general"></select>
+                </div>
+                <div class="campo">
+                    <label for="inp-limite-advertencia">Limite dV% Advertencia</label>
+                    <input type="number" id="inp-limite-advertencia" value="3" min="1" max="10" step="0.5">
+                </div>
+                <div class="campo">
+                    <label for="inp-limite-peligro">Limite dV% Peligro</label>
+                    <input type="number" id="inp-limite-peligro" value="5" min="2" max="15" step="0.5">
+                </div>
+            </div>
+        </div>
+
+        <div class="kpis-globales" aria-label="Indicadores globales de la instalacion">
+            <article class="kpi-card" id="kpi-corriente-total">
+                <div class="kpi-icon">I</div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Corriente Total</span>
+                    <span class="kpi-valor" id="val-corriente-total">0 A</span>
+                    <div class="kpi-barra">
+                        <div class="kpi-progreso" id="prog-corriente-total"></div>
+                    </div>
+                    <span class="kpi-detalle" id="det-corriente-total">de 0 A (General)</span>
+                </div>
+                <span class="kpi-estado estado-normal" id="estado-corriente-total">Normal</span>
+            </article>
+
+            <article class="kpi-card" id="kpi-potencia-total">
+                <div class="kpi-icon">P</div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Potencia Consumida</span>
+                    <span class="kpi-valor" id="val-potencia-total">0 W</span>
+                    <span class="kpi-detalle">Potencia util en cargas</span>
+                </div>
+            </article>
+
+            <article class="kpi-card" id="kpi-perdida-total">
+                <div class="kpi-icon">Q</div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Perdida en Conductores</span>
+                    <span class="kpi-valor" id="val-perdida-total">0 W</span>
+                    <span class="kpi-detalle">Efecto Joule (calor)</span>
+                </div>
+            </article>
+
+            <article class="kpi-card kpi-estado-global" id="kpi-estado-global">
+                <div class="kpi-icon">!</div>
+                <div class="kpi-info">
+                    <span class="kpi-label">Estado General</span>
+                    <span class="kpi-valor estado-normal" id="val-estado-global">NORMAL</span>
+                    <span class="kpi-detalle" id="det-estado-global">0 alertas activas</span>
+                </div>
+            </article>
+        </div>
+    </section>
+
+    <main class="contenedor-principal">
+        <aside class="columna-izquierda" aria-label="Constructor de ramas y cargas">
+            <div class="panel-ramas" id="panel-ramas">
+                <div class="mensaje-vacio" id="msg-vacio">
+                    <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                    </svg>
+                    <h3>No hay ramas configuradas</h3>
+                    <p>Presiona <strong>"+ Nueva Rama"</strong> para comenzar a modelar tu instalacion electrica.</p>
+                    <button id="btn-primera-rama" class="btn btn-principal">Crear primera rama</button>
+                </div>
+            </div>
+        </aside>
+
+        <aside class="columna-derecha" aria-label="Visualizacion y analisis">
+            <div class="tabs" role="tablist">
+                <button class="tab-btn active" role="tab" aria-selected="true" data-tab="diagrama">Diagrama Electrico</button>
+                <button class="tab-btn" role="tab" aria-selected="false" data-tab="diagnostico">Diagnostico</button>
+                <button class="tab-btn" role="tab" aria-selected="false" data-tab="matematicas">Calculos Matematicos</button>
+            </div>
+
+            <div class="tab-panel active" id="panel-diagrama" role="tabpanel">
+                <div class="contenedor-svg" id="contenedor-svg">
+                    <svg id="svg-diagrama" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet" aria-label="Diagrama unifilar de la instalacion electrica"></svg>
+                    <div class="leyenda-diagrama" id="leyenda-diagrama"></div>
+                </div>
+            </div>
+
+            <div class="tab-panel" id="panel-diagnostico" role="tabpanel">
+                <div class="panel-diagnostico" id="panel-diagnostico-contenido">
+                    <div class="diagnostico-vacio">
+                        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M12 16v-4"></path>
+                            <path d="M12 8h.01"></path>
+                        </svg>
+                        <h4>Sin analisis disponible</h4>
+                        <p>Configura al menos una rama con cargas para ver el diagnostico.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-panel" id="panel-matematicas" role="tabpanel">
+                <div class="panel-matematicas" id="panel-matematicas-contenido">
+                    <div class="selector-rama-matematicas">
+                        <label for="sel-rama-matematicas">Seleccionar rama para ver detalle:</label>
+                        <select id="sel-rama-matematicas" disabled>
+                            <option value="">— Selecciona una rama —</option>
+                        </select>
+                    </div>
+                    <div class="matematicas-contenido" id="matematicas-contenido">
+                        <div class="matematicas-vacio">
+                            <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M9 18V5l12-2v13"></path>
+                                <circle cx="6" cy="18" r="3"></circle>
+                                <circle cx="18" cy="16" r="3"></circle>
+                            </svg>
+                            <h4>Selecciona una rama</h4>
+                            <p>Elige una rama del selector para ver el desarrollo paso a paso de las formulas de Ohm, Kirchhoff y Potencia con sus valores numericos.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </main>
+
+    <dialog id="modal-formulas" class="modal-formulas">
+        <div class="modal-contenido">
+            <header class="modal-header">
+                <h2>Formulas y Metodo de Calculo</h2>
+                <button class="btn-cerrar" id="btn-cerrar-formulas" aria-label="Cerrar">x</button>
+            </header>
+            <div class="modal-cuerpo">
+                <section class="formula-seccion">
+                    <h3>1. Resistencia del Conductor (Ida y Vuelta)</h3>
+                    <div class="formula-box">
+                        R_cable = rho * (2 * L) / A
+                        rho = 0.0172 ohm·mm2/m (cobre a 20°C) • L = largo en metros • A = seccion en mm2
+                    </div>
+                    <p>Si hay extension: <strong>R_total = R_rama + R_extension</strong></p>
+                </section>
+
+                <section class="formula-seccion">
+                    <h3>2. Resistencia Equivalente de Cargas en Paralelo</h3>
+                    <div class="formula-box">
+                        R_equipo = Vf^2 / P_nominal
+                        1/R_cargas = Sum (c_j / R_equipo,j)
+                    </div>
+                </section>
+
+                <section class="formula-seccion">
+                    <h3>3. Ley de Ohm en la Rama</h3>
+                    <div class="formula-box">
+                        R_total = R_cable + R_cargas
+                        I_rama = Vf / R_total
+                    </div>
+                </section>
+
+                <section class="formula-seccion">
+                    <h3>4. 2da Ley de Kirchhoff (Malla) - Caida de Voltaje</h3>
+                    <div class="formula-box">
+                        dV_cable = I_rama * R_cable
+                        V_carga = Vf - dV_cable
+                        dV% = (dV_cable / Vf) * 100
+                    </div>
+                    <p>Verificacion: Vf - dV_cable - V_carga = 0</p>
+                </section>
+
+                <section class="formula-seccion">
+                    <h3>5. 1ra Ley de Kirchhoff (Nodos)</h3>
+                    <div class="formula-box">
+                        Nodo Rama: Sum (c_j * I_equipo,j) = I_rama
+                        Nodo Tablero: I_total = Sum I_rama,k
+                    </div>
+                </section>
+
+                <section class="formula-seccion">
+                    <h3>6. Ecuaciones de Potencia</h3>
+                    <div class="formula-box">
+                        P_carga = V_carga * I_rama (Potencia util)
+                        P_perdida = I_rama^2 * R_cable = dV_cable * I_rama (Calor/Joule)
+                        P_total = Vf * I_total = Sum (P_carga + P_perdida)
+                    </div>
+                </section>
+
+                <section class="formula-seccion">
+                    <h3>7. Criterios de Alerta (SEC RIC Nº 10)</h3>
+                    <table class="tabla-alertas">
+                        <thead>
+                            <tr><th>Condicion</th><th>Estado</th><th>Accion</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr class="peligro"><td>I > I_prot o I > I_cable</td><td>PELIGRO</td><td>Disparo automatico / Riesgo incendio</td></tr>
+                            <tr class="peligro"><td>dV% > 5%</td><td>PELIGRO</td><td>Daño a equipos / Mal funcionamiento</td></tr>
+                            <tr class="advertencia"><td>I >= 80% min(I_prot, I_cable)</td><td>ADVERTENCIA</td><td>Cerca del limite, no agregar cargas</td></tr>
+                            <tr class="advertencia"><td>3% < dV% <= 5%</td><td>ADVERTENCIA</td><td>Aumentar seccion o acortar distancia</td></tr>
+                            <tr class="normal"><td>I < 80% y dV% <= 3%</td><td>NORMAL</td><td>Operacion segura</td></tr>
+                        </tbody>
+                    </table>
+                </section>
+            </div>
+        </div>
+    </dialog>
+
+    <dialog id="modal-confirmar" class="modal-confirmar">
+        <div class="modal-contenido modal-pequeno">
+            <h3>Reiniciar simulador?</h3>
+            <p>Se perderan todas las ramas y configuraciones actuales. ¿Continuar?</p>
+            <div class="modal-acciones">
+                <button class="btn btn-secundario" id="btn-cancelar-reinicio">Cancelar</button>
+                <button class="btn btn-peligro" id="btn-confirmar-reinicio">Si, reiniciar</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script defer src="js/catalog.js"></script>
+    <script defer src="js/physics.js"></script>
+    <script defer src="js/diagram.js"></script>
+    <script defer src="js/presets.js"></script>
+    <script defer src="js/app.js"></script>
+</body>
+</html>
