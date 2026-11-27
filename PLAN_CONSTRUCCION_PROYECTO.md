@@ -212,13 +212,18 @@ Cada rama (y la extensión, si está activa) se evalúa con tres estados:
 | :--- | :---: | :--- |
 | $I_{\text{rama}} > I_{\text{prot}}$ | **PELIGRO (Rojo)** | **Disparo de protección:** la corriente supera el automático de la rama ($I_{\text{rama}} > I_{\text{prot}}$). |
 | $I_{\text{rama}} > I_{\text{cable}}$ (o $> I_{\text{ext}}$) | **PELIGRO (Rojo)** | **Sobrecarga térmica en conductor:** el cable supera su ampacidad máxima; alto riesgo de sobrecalentamiento e incendio. |
+| $I_{\text{prot}} > I_{\text{cable}}$ | **PELIGRO (Rojo)** | **Automático sobredimensionado:** el cable puede sobrecalentarse sin que el automático se dispare. |
+| $I_{\text{prot}} > I_{\text{ext}}$ | **ADVERTENCIA (Amarillo)** | **Extensión sin protección:** el automático no protege la extensión si se conectan más equipos. |
 | $\Delta V\% > 5\%$ | **PELIGRO (Rojo)** | **Caída de voltaje crítica:** pérdida superior al 5%; riesgo de mal funcionamiento o daño a equipos. |
-| $0.8 \cdot \min(I_{\text{prot}}, I_{\text{cable}}) \le I_{\text{rama}} \le \min(I_{\text{prot}}, I_{\text{cable}})$ | **ADVERTENCIA (Amarillo)** | **Cerca del límite ($\ge 80\%$):** evitar conectar equipos adicionales en esta rama. |
+| $0.8 \cdot \min(I_{\text{prot}}, I_{\text{cable}}, I_{\text{ext}}) \le I_{\text{rama}} \le \min(I_{\text{prot}}, I_{\text{cable}}, I_{\text{ext}})$ | **ADVERTENCIA (Amarillo)** | **Cerca del límite ($\ge 80\%$):** evitar conectar equipos adicionales en esta rama. |
 | $3\% < \Delta V\% \le 5\%$ | **ADVERTENCIA (Amarillo)** | **Caída de voltaje elevada:** supera el 3% recomendado; considerar aumentar sección del cable o acortar distancia. |
 | Todo bajo el 80% y $\Delta V\% \le 3\%$ | **NORMAL (Verde)** | **Operación segura:** corriente y caída de tensión dentro de los límites establecidos. |
 
+El estado de la rama es el **peor** de todos sus problemas, y el simulador muestra la lista completa (no solo el primero).
+
 **Evaluación Global del Tablero:**
 * Si $I_{\text{total}} > I_{\text{general}}$, se activa **Alerta Crítica General**: *"Sobrecarga en línea principal: se disparará el automático general del tablero"*.
+* El **estado de la instalación** es el peor entre el automático general y todas las ramas (una rama en peligro deja la instalación en peligro aunque el automático general esté bien).
 * Recomendaciones automáticas contextuales: por ejemplo, sugerir cambiar de calibre `1.5 mm²` a `2.5 mm²`, quitar la extensión o mover un artefacto de alto consumo a otra rama con holgura.
 
 ---

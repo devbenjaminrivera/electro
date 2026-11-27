@@ -10,9 +10,9 @@ window.EscenariosPredefinidos = (function() {
     const ESCENARIO_1 = {
         id: 'escenario-1',
         nombre: 'Sobrecarga en enchufes de vivienda',
-        descripcion: 'Una sola rama de 1.5 mm2 con 3 equipos de alto consumo. Demuestra disparo de automatico y sobrecarga termica.',
+        descripcion: 'Una sola rama de 1,5 mm² con 3 equipos de alto consumo. Demuestra disparo del automático y sobrecarga térmica.',
         parametros: { voltajeFuente: 220, automaticoGeneral: 25, limitesCaida: { advertencia: 3, peligro: 5 } },
-        ramas: [{ nombre: 'Enchufes Sala/Comedor', longitud: 15, seccion: 1.5, automatico: 10, extension: { activa: false, longitud: 0, seccion: 1.5 }, cargas: [{ nombre: 'Estufa electrica / Termoventilador', potencia: 2000, cantidad: 1, encendido: true }, { nombre: 'Hervidor electrico', potencia: 1800, cantidad: 1, encendido: true }, { nombre: 'Computador de escritorio', potencia: 400, cantidad: 1, encendido: true }] }]
+        ramas: [{ nombre: 'Enchufes Sala/Comedor', longitud: 15, seccion: 1.5, automatico: 10, extension: { activa: false, longitud: 0, seccion: 1.5 }, cargas: [{ nombre: 'Estufa eléctrica / Termoventilador', potencia: 2000, cantidad: 1, encendido: true }, { nombre: 'Hervidor eléctrico', potencia: 1800, cantidad: 1, encendido: true }, { nombre: 'Computador de escritorio', potencia: 400, cantidad: 1, encendido: true }] }]
     };
 
     // Escenario 2: Taller con extension larga
@@ -20,8 +20,8 @@ window.EscenariosPredefinidos = (function() {
     // Esperado: dV% > 5%, voltaje reducido, mucha perdida en extension
     const ESCENARIO_2 = {
         id: 'escenario-2',
-        nombre: 'Pequeño taller con extension larga',
-        descripcion: 'Rama de taller con extension larga y delgada (0.75 mm2, 25 m). Demuestra caida de voltaje critica y riesgo en alargador.',
+        nombre: 'Pequeño taller con extensión larga',
+        descripcion: 'Rama de taller con extensión larga y delgada (0,75 mm², 25 m). Demuestra caída de voltaje crítica y sobrecarga del alargador.',
         parametros: { voltajeFuente: 220, automaticoGeneral: 32, limitesCaida: { advertencia: 3, peligro: 5 } },
         ramas: [{ nombre: 'Taller - Sierra y Taladro', longitud: 12, seccion: 2.5, automatico: 16, extension: { activa: true, longitud: 25, seccion: 0.75 }, cargas: [{ nombre: 'Sierra circular', potencia: 1600, cantidad: 1, encendido: true }, { nombre: 'Taladro percutor', potencia: 800, cantidad: 1, encendido: true }] }]
     };
@@ -32,11 +32,11 @@ window.EscenariosPredefinidos = (function() {
     const ESCENARIO_3 = {
         id: 'escenario-3',
         nombre: 'Instalación residencial equilibrada (Segura)',
-        descripcion: 'Instalación bien dimensionada con 3 ramas. Demuestra operacion segura con margenes adecuados.',
+        descripcion: 'Instalación bien dimensionada con 3 ramas. Demuestra operación segura con márgenes adecuados.',
         parametros: { voltajeFuente: 220, automaticoGeneral: 32, limitesCaida: { advertencia: 3, peligro: 5 } },
         ramas: [
             { nombre: 'Alumbrado + TV', longitud: 15, seccion: 1.5, automatico: 10, extension: { activa: false, longitud: 0, seccion: 1.5 }, cargas: [{ nombre: 'Ampolleta LED', potencia: 15, cantidad: 6, encendido: true }, { nombre: 'Televisor / Monitor', potencia: 120, cantidad: 1, encendido: true }] },
-            { nombre: 'Cocina', longitud: 10, seccion: 2.5, automatico: 16, extension: { activa: false, longitud: 0, seccion: 2.5 }, cargas: [{ nombre: 'Refrigerador', potencia: 350, cantidad: 1, encendido: true }, { nombre: 'Hervidor electrico', potencia: 1800, cantidad: 1, encendido: true }] },
+            { nombre: 'Cocina', longitud: 10, seccion: 2.5, automatico: 16, extension: { activa: false, longitud: 0, seccion: 2.5 }, cargas: [{ nombre: 'Refrigerador', potencia: 350, cantidad: 1, encendido: true }, { nombre: 'Hervidor eléctrico', potencia: 1800, cantidad: 1, encendido: true }] },
             { nombre: 'Escritorio / Taller', longitud: 12, seccion: 2.5, automatico: 16, extension: { activa: false, longitud: 0, seccion: 2.5 }, cargas: [{ nombre: 'Computador de escritorio', potencia: 400, cantidad: 1, encendido: true }, { nombre: 'Taladro percutor', potencia: 800, cantidad: 1, encendido: false }] }
         ]
     };
@@ -46,10 +46,10 @@ window.EscenariosPredefinidos = (function() {
     // Esperado: cerca limite auto 16A, dV% moderada
     const ESCENARIO_4 = {
         id: 'escenario-4',
-        nombre: 'Cocina: Microondas + Hervidor simultaneos',
-        descripcion: 'Dos equipos de alto consumo en cocina. Demuestra advertencia por cercania al limite de proteccion.',
+        nombre: 'Cocina: microondas y hervidor simultáneos',
+        descripcion: 'Dos equipos de alto consumo en la cocina. Demuestra advertencia por cercanía al límite del automático.',
         parametros: { voltajeFuente: 220, automaticoGeneral: 25, limitesCaida: { advertencia: 3, peligro: 5 } },
-        ramas: [{ nombre: 'Cocina Principal', longitud: 8, seccion: 2.5, automatico: 16, extension: { activa: false, longitud: 0, seccion: 2.5 }, cargas: [{ nombre: 'Microondas', potencia: 1200, cantidad: 1, encendido: true }, { nombre: 'Hervidor electrico', potencia: 1800, cantidad: 1, encendido: true }, { nombre: 'Refrigerador', potencia: 350, cantidad: 1, encendido: true }] }]
+        ramas: [{ nombre: 'Cocina Principal', longitud: 8, seccion: 2.5, automatico: 16, extension: { activa: false, longitud: 0, seccion: 2.5 }, cargas: [{ nombre: 'Microondas', potencia: 1200, cantidad: 1, encendido: true }, { nombre: 'Hervidor eléctrico', potencia: 1800, cantidad: 1, encendido: true }, { nombre: 'Refrigerador', potencia: 350, cantidad: 1, encendido: true }] }]
     };
 
     // Escenario 5: Caso prueba A validacion matematica
@@ -58,9 +58,9 @@ window.EscenariosPredefinidos = (function() {
     const ESCENARIO_VALIDACION_A = {
         id: 'validacion-a',
         nombre: 'Caso Prueba A: Rama simple 2200W (Validación)',
-        descripcion: 'Caso de prueba del plan para verificacion matematica exacta.',
+        descripcion: 'Caso de prueba del plan para la verificación matemática exacta.',
         parametros: { voltajeFuente: 220, automaticoGeneral: 32, limitesCaida: { advertencia: 3, peligro: 5 } },
-        ramas: [{ nombre: 'Test Validacion A', longitud: 10, seccion: 2.5, automatico: 16, extension: { activa: false, longitud: 0, seccion: 2.5 }, cargas: [{ nombre: 'Carga 2200W', potencia: 2200, cantidad: 1, encendido: true }] }]
+        ramas: [{ nombre: 'Rama de validación A', longitud: 10, seccion: 2.5, automatico: 16, extension: { activa: false, longitud: 0, seccion: 2.5 }, cargas: [{ nombre: 'Carga 2200W', potencia: 2200, cantidad: 1, encendido: true }] }]
     };
 
     const TODOS_ESCENARIOS = [ESCENARIO_1, ESCENARIO_2, ESCENARIO_3, ESCENARIO_4, ESCENARIO_VALIDACION_A];
