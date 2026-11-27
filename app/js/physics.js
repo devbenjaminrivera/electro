@@ -7,12 +7,18 @@ window.MotorCalculo = (function() {
     const CAT = window.CatalogoElectrico;
     const RHO = CAT.CONSTANTES.RHO_COBRE;
     const V_NOMINAL = CAT.CONSTANTES.VOLTAJE_NOMINAL;
+    const FACTOR_ADV = CAT.CONSTANTES.FACTOR_ADVERTENCIA;
+    const GRAVEDAD = { normal: 0, advertencia: 1, peligro: 2 };
 
     // redondeo para evitar basura flotante
     function redondear(valor, decimales = 4) {
         if (!isFinite(valor)) return valor;
         const factor = Math.pow(10, decimales);
         return Math.round(valor * factor) / factor;
+    }
+
+    function peorEstado(estados) {
+        return estados.reduce((peor, e) => (GRAVEDAD[e] > GRAVEDAD[peor] ? e : peor), 'normal');
     }
 
     // resistencia cable ida y vuelta
@@ -42,67 +48,103 @@ window.MotorCalculo = (function() {
         return 1 / sumaConductancias;
     }
 
-    // evalua estado: normal / advertencia / peligro
-    function evaluarEstadoRama(I_rama, I_proteccion, I_cable, deltaV_porcentaje, limites) {
-        const I_limite = Math.min(I_proteccion, I_cable);
-        const umbralAdvertencia = I_limite * CAT.CONSTANTES.FACTOR_ADVERTENCIA;
+    // evalua una rama y devuelve TODOS los problemas encontrados.
+    // estado = el peor problema; mensaje/codigo = el primero de ese nivel.
+    // I_ext: ampacidad de la extension (null si no hay extension activa)
+    function evaluarEstadoRama(I_rama, I_proteccion, I_cable, deltaV_porcentaje, limites, I_ext = null) {
         const limAdv = limites?.advertencia ?? CAT.CONSTANTES.LIMITE_CAIDA_ADVERTENCIA;
         const limPeligro = limites?.peligro ?? CAT.CONSTANTES.LIMITE_CAIDA_PELIGRO;
+        const I = redondear(I_rama, 2);
+        const problemas = [];
+        const agregar = (nivel, codigo, mensaje) => problemas.push({ nivel, codigo, mensaje });
 
-        // PELIGRO: sobrecorriente
+        // PELIGRO
         if (I_rama > I_proteccion) {
-            return { estado: 'peligro', codigo: 'SOBRECARGA_PROTECCION', mensaje: `Disparo de proteccion: la corriente (${redondear(I_rama,2)} A) supera el automatico de ${I_proteccion} A`, critico: true };
+            agregar('peligro', 'SOBRECARGA_PROTECCION', `Disparo de protección: la corriente (${I} A) supera el automático de ${I_proteccion} A.`);
         }
-        if (I_rama > I_cable) {
-            return { estado: 'peligro', codigo: 'SOBRECARGA_TERMICA', mensaje: `Sobrecarga termica en conductor: ${redondear(I_rama,2)} A supera ampacidad de ${I_cable} A (riesgo incendio)`, critico: true };
+        if (I_cable === null) {
+            agregar('advertencia', 'SIN_AMPACIDAD', 'No hay ampacidad registrada en el catálogo para la sección de este cable.');
+        } else {
+            if (I_rama > I_cable) {
+                agregar('peligro', 'SOBRECARGA_TERMICA', `Sobrecarga térmica en el conductor: ${I} A supera su ampacidad de ${I_cable} A (riesgo de incendio).`);
+            }
+            if (I_proteccion > I_cable) {
+                agregar('peligro', 'PROTECCION_SOBREDIMENSIONADA', `El automático de ${I_proteccion} A es mayor que la ampacidad del cable (${I_cable} A): el cable puede sobrecalentarse sin que el automático se dispare.`);
+            }
+        }
+        if (I_ext !== null) {
+            if (I_rama > I_ext) {
+                agregar('peligro', 'SOBRECARGA_EXTENSION', `Sobrecarga térmica en la extensión: ${I} A supera su ampacidad de ${I_ext} A (riesgo de incendio en la zapatilla).`);
+            } else if (I_proteccion > I_ext) {
+                agregar('advertencia', 'EXTENSION_SIN_PROTECCION', `El automático de ${I_proteccion} A no protege la extensión de ${I_ext} A: si se conectan más equipos puede sobrecalentarse antes de que el automático actúe.`);
+            }
         }
         if (deltaV_porcentaje > limPeligro) {
-            return { estado: 'peligro', codigo: 'CAIDA_VOLTAJE_CRITICA', mensaje: `Caida de voltaje critica: ${redondear(deltaV_porcentaje,2)}% > ${limPeligro}% (riesgo daño equipos)`, critico: true };
+            agregar('peligro', 'CAIDA_VOLTAJE_CRITICA', `Caída de voltaje crítica: ${redondear(deltaV_porcentaje, 2)} % > ${limPeligro} % (riesgo de daño a los equipos).`);
         }
-        // ADVERTENCIA: cerca del limite
-        if (I_rama >= umbralAdvertencia) {
-            return { estado: 'advertencia', codigo: 'CERCA_LIMITE_CORRIENTE', mensaje: `Cerca del limite (${redondear(I_rama,2)} A ≥ ${redondear(umbralAdvertencia,1)} A = 80% de ${I_limite} A)`, critico: false };
+
+        // ADVERTENCIA (solo si ese mismo valor no esta ya en peligro)
+        const limitesCorriente = [I_proteccion, I_cable, I_ext].filter(v => v !== null && v > 0);
+        const I_limite = Math.min(...limitesCorriente);
+        const umbral = I_limite * FACTOR_ADV;
+        if (I_rama >= umbral && I_rama <= I_limite) {
+            agregar('advertencia', 'CERCA_LIMITE_CORRIENTE', `Cerca del límite: ${I} A ≥ ${redondear(umbral, 1)} A (80 % de ${I_limite} A). Evitar conectar más equipos.`);
         }
-        if (deltaV_porcentaje > limAdv) {
-            return { estado: 'advertencia', codigo: 'CAIDA_VOLTAJE_ELEVADA', mensaje: `Caida de voltaje elevada: ${redondear(deltaV_porcentaje,2)}% > ${limAdv}% (recomendado)`, critico: false };
+        if (deltaV_porcentaje > limAdv && deltaV_porcentaje <= limPeligro) {
+            agregar('advertencia', 'CAIDA_VOLTAJE_ELEVADA', `Caída de voltaje elevada: ${redondear(deltaV_porcentaje, 2)} % > ${limAdv} % recomendado.`);
         }
-        // NORMAL
-        return { estado: 'normal', codigo: 'NORMAL', mensaje: 'Operacion segura: corriente y caida de tension dentro de limites', critico: false };
+
+        const estado = peorEstado(problemas.map(p => p.nivel));
+        if (estado === 'normal') {
+            return { estado, codigo: 'NORMAL', mensaje: 'Operación segura: corriente y caída de tensión dentro de los límites.', critico: false, problemas: [] };
+        }
+        const principal = problemas.find(p => p.nivel === estado);
+        return { estado, codigo: principal.codigo, mensaje: principal.mensaje, critico: estado === 'peligro', problemas };
     }
 
     // recomendaciones contextuales
-    function generarRecomendaciones(rama, resultado, instalacion) {
+    function generarRecomendaciones(rama, resultado) {
         const recs = [];
-        const I_rama = resultado.I_rama;
-        const I_cable = CAT.getAmpacidad(rama.seccion) || 0;
-        const I_prot = rama.automatico || 0;
-        const deltaV_pct = resultado.deltaV_porcentaje;
+        const { I_rama, deltaV_porcentaje, I_cable, I_prot_rama, I_ext, limites } = resultado;
+        const limAdv = limites?.advertencia ?? CAT.CONSTANTES.LIMITE_CAIDA_ADVERTENCIA;
 
-        if (I_rama > I_cable) {
-            const seccionSugerida = CAT.CONDUCTORES.find(c => c.ampacidad >= I_rama * 1.25);
-            if (seccionSugerida) {
-                recs.push({ tipo: 'cambiar_cable', prioridad: 'alta', mensaje: `Cambiar cable de ${rama.seccion} mm2 a ${seccionSugerida.seccion} mm2 (ampacidad ${seccionSugerida.ampacidad} A)` });
-            }
+        if (I_cable !== null && I_rama > I_cable) {
+            const sugerida = CAT.CONDUCTORES.find(c => c.ampacidad >= I_rama * 1.25);
+            recs.push({ tipo: 'cambiar_cable', prioridad: 'alta', mensaje: sugerida
+                ? `Cambiar el cable de ${rama.seccion} mm² a ${sugerida.seccion} mm² (ampacidad ${sugerida.ampacidad} A) o repartir los equipos en otra rama.`
+                : 'La corriente supera todos los cables del catálogo: repartir los equipos en varias ramas.' });
         }
 
-        if (deltaV_pct > CAT.CONSTANTES.LIMITE_CAIDA_ADVERTENCIA) {
-            if (rama.extension && rama.extension.longitud > 0) {
-                recs.push({ tipo: 'quitar_extension', prioridad: 'alta', mensaje: 'La extension/zapatilla causa caida de voltaje excesiva. Quitala o usa una de mayor seccion.' });
+        if (I_cable !== null && I_prot_rama > I_cable) {
+            const protAdecuada = [...CAT.PROTECCIONES_RAMA].reverse().find(a => a <= I_cable);
+            recs.push({ tipo: 'bajar_proteccion', prioridad: 'alta', mensaje: protAdecuada
+                ? `Usar un automático de ${protAdecuada} A (no mayor que los ${I_cable} A del cable) o aumentar la sección del cable.`
+                : 'Aumentar la sección del cable para que soporte la corriente del automático.' });
+        }
+
+        if (I_rama > I_prot_rama) {
+            recs.push({ tipo: 'repartir_cargas', prioridad: 'alta', mensaje: 'Apagar o mover a otra rama algún equipo de alto consumo para no disparar el automático.' });
+        }
+
+        if (I_ext !== null && I_rama > I_ext * FACTOR_ADV) {
+            const sugerida = CAT.CONDUCTORES.find(c => c.ampacidad >= I_rama * 1.25);
+            const verbo = I_rama > I_ext ? 'supera' : 'está cerca de';
+            recs.push({ tipo: 'extension_peligro', prioridad: 'alta', mensaje: `Con ${redondear(I_rama, 2)} A la extensión de ${rama.extension.seccion} mm² ${verbo} su límite de ${I_ext} A. ` +
+                (sugerida ? `Usar una extensión de al menos ${sugerida.seccion} mm² o conectar los equipos directo al enchufe.` : 'Conectar los equipos directo al enchufe.') });
+        }
+
+        if (deltaV_porcentaje > limAdv) {
+            if (I_ext !== null) {
+                recs.push({ tipo: 'quitar_extension', prioridad: 'alta', mensaje: 'La extensión aumenta la caída de voltaje: acortarla, usar una de mayor sección o quitarla.' });
             } else {
-                recs.push({ tipo: 'aumentar_seccion', prioridad: 'media', mensaje: `Caida de voltaje ${redondear(deltaV_pct,2)}%. Aumenta seccion del cable o reduce el largo.` });
+                recs.push({ tipo: 'aumentar_seccion', prioridad: 'media', mensaje: `Caída de voltaje de ${redondear(deltaV_porcentaje, 2)} %: aumentar la sección del cable o acortar el tramo.` });
             }
         }
 
-        if (I_rama >= Math.min(I_prot, I_cable) * CAT.CONSTANTES.FACTOR_ADVERTENCIA && I_rama <= Math.min(I_prot, I_cable)) {
-            recs.push({ tipo: 'no_agregar_cargas', prioridad: 'media', mensaje: 'Rama cerca de su capacidad. Evita conectar mas equipos en esta rama.' });
-        }
-
-        if (rama.extension && rama.extension.longitud > 0) {
-            const I_ext = I_rama;
-            const I_cable_ext = CAT.getAmpacidad(rama.extension.seccion) || 0;
-            if (I_ext > I_cable_ext * CAT.CONSTANTES.FACTOR_ADVERTENCIA) {
-                recs.push({ tipo: 'extension_peligro', prioridad: 'alta', mensaje: `La extension de ${rama.extension.seccion} mm2 (${I_cable_ext} A) esta cerca de su limite con ${redondear(I_ext,2)} A. Riesgo de sobrecalentamiento.` });
-            }
+        const limitesCorriente = [I_prot_rama, I_cable, I_ext].filter(v => v !== null && v > 0);
+        const I_limite = Math.min(...limitesCorriente);
+        if (I_rama >= I_limite * FACTOR_ADV && I_rama <= I_limite) {
+            recs.push({ tipo: 'no_agregar_cargas', prioridad: 'media', mensaje: 'Rama cerca de su capacidad: evitar conectar más equipos en esta rama.' });
         }
 
         return recs;
@@ -110,8 +152,8 @@ window.MotorCalculo = (function() {
 
     // funcion principal: calcula toda la instalacion
     function calcularInstalacion(instalacion) {
-        const V_f = instalacion.voltajeFuente || V_NOMINAL;
-        const I_general = instalacion.automaticoGeneral || 32;
+        const V_f = Number(instalacion.voltajeFuente) || V_NOMINAL;
+        const I_general = Number(instalacion.automaticoGeneral) || 32;
         const limites = instalacion.limitesCaida || {};
         const ramas = instalacion.ramas || [];
 
@@ -119,7 +161,7 @@ window.MotorCalculo = (function() {
         let I_total = 0;
         let P_carga_total = 0;
         let P_perdida_total = 0;
-        let alertasGlobales = [];
+        const alertasGlobales = [];
 
         for (let i = 0; i < ramas.length; i++) {
             const rama = ramas[i];
@@ -134,16 +176,13 @@ window.MotorCalculo = (function() {
             const R_cable_rama = calcResistenciaCable(L_rama, A_rama);
 
             // resistencia extension si hay
-            let R_ext = 0;
-            if (extension.activa && extension.longitud > 0 && extension.seccion > 0) {
-                R_ext = calcResistenciaCable(Number(extension.longitud), Number(extension.seccion));
-            }
+            const extActiva = !!(extension.activa && Number(extension.longitud) > 0 && Number(extension.seccion) > 0);
+            const R_ext = extActiva ? calcResistenciaCable(Number(extension.longitud), Number(extension.seccion)) : 0;
             const R_cable_total = R_cable_rama + R_ext;
 
             // resistencia equivalente cargas
             const R_cargas = calcResistenciaEquivalente(cargas, V_f);
 
-            // corriente rama (Ohm)
             let I_rama = 0;
             let V_carga = V_f;
             let deltaV_cable = 0;
@@ -154,10 +193,11 @@ window.MotorCalculo = (function() {
             let verificacionKVL = V_f;
 
             if (isFinite(R_cargas) && R_cargas > 0) {
+                // Ley de Ohm en la rama
                 const R_total_rama = R_cable_total + R_cargas;
                 I_rama = V_f / R_total_rama;
 
-                // caida voltaje (Kirchhoff malla)
+                // caida de voltaje (2da ley de Kirchhoff en la malla)
                 deltaV_cable = I_rama * R_cable_total;
                 V_carga = V_f - deltaV_cable;
                 deltaV_porcentaje = (deltaV_cable / V_f) * 100;
@@ -165,32 +205,39 @@ window.MotorCalculo = (function() {
 
                 // potencia (Joule)
                 P_perdida = I_rama * I_rama * R_cable_rama;
+                P_perdida_ext = I_rama * I_rama * R_ext;
                 P_carga = V_carga * I_rama;
-                if (extension.activa && R_ext > 0) {
-                    P_perdida_ext = I_rama * I_rama * R_ext;
-                }
             }
 
-            const I_cable = CAT.getAmpacidad(A_rama) || 0;
-            const estado = evaluarEstadoRama(I_rama, I_prot_rama, I_cable, deltaV_porcentaje, limites);
+            const I_cable = CAT.getAmpacidad(A_rama);
+            const I_ext = extActiva ? CAT.getAmpacidad(Number(extension.seccion)) : null;
+            const estado = evaluarEstadoRama(I_rama, I_prot_rama, I_cable, deltaV_porcentaje, limites, I_ext);
 
-            // detalle por equipo (para KCL nodo rama)
-            const equiposDetalle = cargas.filter(c => c.encendido).map(carga => {
+            // detalle por equipo, en el mismo orden que las cargas (los apagados quedan con 0 A)
+            const equiposDetalle = cargas.map(carga => {
                 const R_eq = calcResistenciaEquipo(carga.potencia, V_f);
-                const I_eq = isFinite(R_eq) && R_eq > 0 ? V_carga / R_eq : 0;
-                const P_eq = I_eq * V_carga;
-                return { ...carga, resistencia: redondear(R_eq, 4), corriente: redondear(I_eq, 4), potencia: redondear(P_eq, 2) };
+                const I_eq = carga.encendido && isFinite(R_eq) && R_eq > 0 ? V_carga / R_eq : 0;
+                const cantidad = carga.cantidad || 1;
+                return {
+                    ...carga,
+                    cantidad,
+                    resistencia: redondear(R_eq, 4),
+                    corriente: redondear(I_eq, 4),                 // por unidad
+                    corrienteTotal: redondear(I_eq * cantidad, 4), // todas las unidades
+                    potenciaReal: redondear(I_eq * V_carga * cantidad, 2)
+                };
             });
 
-            const sumaCorrientesEquipos = equiposDetalle.reduce((sum, eq) => sum + eq.corriente, 0);
+            // 1ra ley de Kirchhoff en el nodo de la rama: suma de corrientes de los equipos = I_rama
+            const sumaCorrientesEquipos = equiposDetalle.reduce((sum, eq) => sum + eq.corrienteTotal, 0);
             const errorKCL_rama = Math.abs(sumaCorrientesEquipos - I_rama);
 
-            const recomendaciones = generarRecomendaciones(rama, { I_rama, deltaV_porcentaje, I_cable, I_prot_rama }, instalacion);
+            const recomendaciones = generarRecomendaciones(rama, { I_rama, deltaV_porcentaje, I_cable, I_prot_rama, I_ext, limites });
 
-            const resultadoRama = {
+            resultadosRamas.push({
                 indice: i, nombre,
                 longitud: L_rama, seccion: A_rama, automatico: I_prot_rama,
-                extension: extension.activa ? { longitud: extension.longitud, seccion: extension.seccion } : null,
+                extension: extActiva ? { longitud: Number(extension.longitud), seccion: Number(extension.seccion) } : null,
                 cargas: equiposDetalle,
                 R_cable_rama: redondear(R_cable_rama, 6), R_ext: redondear(R_ext, 6), R_cable_total: redondear(R_cable_total, 6),
                 R_cargas: isFinite(R_cargas) ? redondear(R_cargas, 4) : Infinity,
@@ -198,41 +245,48 @@ window.MotorCalculo = (function() {
                 I_rama: redondear(I_rama, 4), V_carga: redondear(V_carga, 2), deltaV_cable: redondear(deltaV_cable, 2),
                 deltaV_porcentaje: redondear(deltaV_porcentaje, 2), P_carga: redondear(P_carga, 2), P_perdida: redondear(P_perdida, 2),
                 P_perdida_ext: redondear(P_perdida_ext, 2), verificacionKVL: redondear(verificacionKVL, 2),
+                sumaCorrientesEquipos: redondear(sumaCorrientesEquipos, 4),
                 errorKCL_rama: redondear(errorKCL_rama, 6),
                 estado: estado.estado, codigoEstado: estado.codigo, mensajeEstado: estado.mensaje, critico: estado.critico,
-                I_cable, I_proteccion: I_prot_rama, recomendaciones
-            };
+                problemas: estado.problemas,
+                I_cable, I_ext, I_proteccion: I_prot_rama, recomendaciones
+            });
 
-            resultadosRamas.push(resultadoRama);
             I_total += I_rama;
             P_carga_total += P_carga;
             P_perdida_total += P_perdida + P_perdida_ext;
 
-            if (estado.critico) {
-                alertasGlobales.push({ tipo: 'rama', indice: i, nombre, nivel: 'peligro', mensaje: estado.mensaje });
-            } else if (estado.estado === 'advertencia') {
-                alertasGlobales.push({ tipo: 'rama', indice: i, nombre, nivel: 'advertencia', mensaje: estado.mensaje });
-            }
+            estado.problemas.forEach(p => alertasGlobales.push({ tipo: 'rama', indice: i, nombre, nivel: p.nivel, codigo: p.codigo, mensaje: p.mensaje }));
         }
 
-        // estado global (Kirchhoff nodo principal)
-        const estadoGlobal = I_total > I_general ? 'peligro' : (I_total >= I_general * CAT.CONSTANTES.FACTOR_ADVERTENCIA ? 'advertencia' : 'normal');
-
-        if (I_total > I_general) {
-            alertasGlobales.push({ tipo: 'general', nivel: 'peligro', mensaje: `SOBRECARGA GENERAL: Corriente total ${redondear(I_total,2)} A supera automatico general de ${I_general} A. Se disparara el automatico principal.` });
-        } else if (I_total >= I_general * CAT.CONSTANTES.FACTOR_ADVERTENCIA) {
-            alertasGlobales.push({ tipo: 'general', nivel: 'advertencia', mensaje: `Cerca del limite general: ${redondear(I_total,2)} A ≥ ${redondear(I_general * CAT.CONSTANTES.FACTOR_ADVERTENCIA,1)} A (80% de ${I_general} A)` });
+        // automatico general (1ra ley de Kirchhoff en el nodo del tablero: I_total = suma de las ramas)
+        const estadoTablero = I_total > I_general ? 'peligro' : (I_total >= I_general * FACTOR_ADV ? 'advertencia' : 'normal');
+        if (estadoTablero === 'peligro') {
+            alertasGlobales.unshift({ tipo: 'general', nivel: 'peligro', mensaje: `Sobrecarga general: la corriente total de ${redondear(I_total, 2)} A supera el automático general de ${I_general} A. Se disparará el automático principal.` });
+        } else if (estadoTablero === 'advertencia') {
+            alertasGlobales.unshift({ tipo: 'general', nivel: 'advertencia', mensaje: `Cerca del límite general: ${redondear(I_total, 2)} A ≥ ${redondear(I_general * FACTOR_ADV, 1)} A (80 % de ${I_general} A).` });
         }
+
+        // estado de toda la instalacion = el peor entre el tablero y las ramas
+        const estadoInstalacion = peorEstado([estadoTablero, ...resultadosRamas.map(r => r.estado)]);
 
         const sumaIrama = resultadosRamas.reduce((sum, r) => sum + r.I_rama, 0);
-        const errorKCL_global = Math.abs(sumaIrama - I_total);
+        const errorKCL_global = Math.abs(sumaIrama - redondear(I_total, 4));
         const P_total_fuente = V_f * I_total;
 
         return {
             parametros: { voltajeFuente: V_f, automaticoGeneral: I_general, limitesCaida: limites, numRamas: ramas.length },
             ramas: resultadosRamas,
             totales: { I_total: redondear(I_total, 4), P_carga_total: redondear(P_carga_total, 2), P_perdida_total: redondear(P_perdida_total, 2), P_total_fuente: redondear(P_total_fuente, 2), rendimiento: I_total > 0 ? redondear((P_carga_total / P_total_fuente) * 100, 2) : 100 },
-            estadoGlobal: { estado: estadoGlobal, alertas: alertasGlobales, conteoPeligro: alertasGlobales.filter(a => a.nivel === 'peligro').length, conteoAdvertencia: alertasGlobales.filter(a => a.nivel === 'advertencia').length },
+            estadoGlobal: {
+                estado: estadoInstalacion,          // peor estado de toda la instalacion
+                estadoTablero,                      // solo el automatico general
+                alertas: alertasGlobales,
+                conteoPeligro: alertasGlobales.filter(a => a.nivel === 'peligro').length,
+                conteoAdvertencia: alertasGlobales.filter(a => a.nivel === 'advertencia').length,
+                ramasPeligro: resultadosRamas.filter(r => r.estado === 'peligro').length,
+                ramasAdvertencia: resultadosRamas.filter(r => r.estado === 'advertencia').length
+            },
             verificaciones: { KCL_global: redondear(errorKCL_global, 6), KVL_todas_ok: resultadosRamas.every(r => Math.abs(r.verificacionKVL - V_f) < 0.01), sumaPotencias: redondear(P_carga_total + P_perdida_total, 2), P_total_fuente: redondear(P_total_fuente, 2) },
             timestamp: new Date().toISOString()
         };

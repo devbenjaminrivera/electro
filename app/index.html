@@ -3,14 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simulador de Sobrecargas Electricas - SEC RIC Nº 10</title>
+    <title>Simulador de Sobrecargas Eléctricas</title>
     <link rel="stylesheet" href="css/styles.css">
+    <script>
+        // aplica el tema guardado antes de pintar la pagina (evita un destello claro)
+        try {
+            var temaGuardado = localStorage.getItem('simulador_tema');
+            if (temaGuardado === 'claro' || temaGuardado === 'oscuro') document.documentElement.setAttribute('data-tema', temaGuardado);
+        } catch (e) { /* sin almacenamiento */ }
+    </script>
 </head>
 <body>
     <header class="header">
         <div class="header-left">
-            <h1 class="titulo-proyecto">Simulador de Sobrecargas Electricas</h1>
-            <span class="subtitulo">Instalaciones residenciales y pequenos talleres • 220 V / 50 Hz • SEC RIC Nº 10</span>
+            <h1 class="titulo-proyecto">Simulador de Sobrecargas Eléctricas</h1>
+            <span class="subtitulo">Instalaciones residenciales y pequeños talleres • 220 V / 50 Hz • Chile</span>
         </div>
         <div class="header-center">
             <div class="selector-escenarios">
@@ -22,141 +29,133 @@
             </div>
         </div>
         <div class="header-right">
-            <button id="btn-nueva-rama" class="btn btn-principal" title="Agregar nueva rama al tablero">+ Nueva Rama</button>
-            <button id="btn-formulas" class="btn btn-secundario" title="Ver formulas y calculo paso a paso">Formulas</button>
-            <button id="btn-imprimir" class="btn btn-secundario" title="Imprimir / Guardar reporte en PDF (Ctrl+P)">Imprimir</button>
-            <button id="btn-reiniciar" class="btn btn-peligro" title="Reiniciar simulador a estado inicial">Reiniciar</button>
+            <button id="btn-nueva-rama" class="btn btn-principal" title="Agregar nueva rama al tablero">+ Nueva rama</button>
+            <button id="btn-formulas" class="btn btn-secundario" title="Ver fórmulas y criterios de alerta">Fórmulas</button>
+            <button id="btn-exportar" class="btn btn-secundario" title="Descargar el circuito como archivo JSON">Exportar</button>
+            <button id="btn-importar" class="btn btn-secundario" title="Abrir un circuito guardado (JSON)">Importar</button>
+            <input type="file" id="inp-importar" accept=".json,application/json" hidden>
+            <button id="btn-imprimir" class="btn btn-secundario" title="Imprimir / guardar reporte en PDF (Ctrl+P)">Imprimir</button>
+            <button id="btn-tema" class="btn btn-secundario btn-tema" title="Cambiar tema: automático (según el sistema), claro u oscuro">Tema: auto</button>
+            <button id="btn-reiniciar" class="btn btn-peligro" title="Reiniciar el simulador">Reiniciar</button>
         </div>
     </header>
 
-    <section class="barra-parametros" aria-label="Parametros generales de la instalacion">
+    <div class="aviso-error" id="aviso-error" role="alert" hidden></div>
+
+    <section class="barra-parametros" aria-label="Parámetros generales de la instalación">
         <div class="parametros-generales">
-            <h2>Parametros Generales</h2>
+            <h2>Parámetros generales</h2>
             <div class="parametros-grid">
                 <div class="campo">
-                    <label for="inp-voltaje">Voltaje Fuente (V)</label>
+                    <label for="inp-voltaje">Voltaje de la fuente (V)</label>
                     <input type="number" id="inp-voltaje" value="220" min="110" max="380" step="1">
                 </div>
                 <div class="campo">
-                    <label for="inp-automatico-general">Automatico General (A)</label>
+                    <label for="inp-automatico-general">Automático general (A)</label>
                     <select id="inp-automatico-general"></select>
                 </div>
                 <div class="campo">
-                    <label for="inp-limite-advertencia">Limite dV% Advertencia</label>
-                    <input type="number" id="inp-limite-advertencia" value="3" min="1" max="10" step="0.5">
+                    <label for="inp-limite-advertencia">Límite ΔV % advertencia</label>
+                    <input type="number" id="inp-limite-advertencia" value="3" min="0.5" max="15" step="0.5">
                 </div>
                 <div class="campo">
-                    <label for="inp-limite-peligro">Limite dV% Peligro</label>
-                    <input type="number" id="inp-limite-peligro" value="5" min="2" max="15" step="0.5">
+                    <label for="inp-limite-peligro">Límite ΔV % peligro</label>
+                    <input type="number" id="inp-limite-peligro" value="5" min="0.5" max="15" step="0.5">
                 </div>
             </div>
         </div>
 
-        <div class="kpis-globales" aria-label="Indicadores globales de la instalacion">
+        <div class="kpis-globales" aria-label="Indicadores globales de la instalación">
             <article class="kpi-card" id="kpi-corriente-total">
                 <div class="kpi-icon">I</div>
                 <div class="kpi-info">
-                    <span class="kpi-label">Corriente Total</span>
+                    <span class="kpi-label">Corriente total</span>
                     <span class="kpi-valor" id="val-corriente-total">0 A</span>
                     <div class="kpi-barra">
                         <div class="kpi-progreso" id="prog-corriente-total"></div>
                     </div>
-                    <span class="kpi-detalle" id="det-corriente-total">de 0 A (General)</span>
+                    <span class="kpi-detalle" id="det-corriente-total">del automático general</span>
                 </div>
-                <span class="kpi-estado estado-normal" id="estado-corriente-total">Normal</span>
+                <span class="kpi-estado estado-normal" id="estado-corriente-total">NORMAL</span>
             </article>
 
             <article class="kpi-card" id="kpi-potencia-total">
                 <div class="kpi-icon">P</div>
                 <div class="kpi-info">
-                    <span class="kpi-label">Potencia Consumida</span>
+                    <span class="kpi-label">Potencia consumida</span>
                     <span class="kpi-valor" id="val-potencia-total">0 W</span>
-                    <span class="kpi-detalle">Potencia util en cargas</span>
+                    <span class="kpi-detalle">Potencia útil en los equipos</span>
                 </div>
             </article>
 
             <article class="kpi-card" id="kpi-perdida-total">
                 <div class="kpi-icon">Q</div>
                 <div class="kpi-info">
-                    <span class="kpi-label">Perdida en Conductores</span>
+                    <span class="kpi-label">Pérdida en conductores</span>
                     <span class="kpi-valor" id="val-perdida-total">0 W</span>
-                    <span class="kpi-detalle">Efecto Joule (calor)</span>
+                    <span class="kpi-detalle">Calor por efecto Joule (I²·R)</span>
                 </div>
             </article>
 
             <article class="kpi-card kpi-estado-global" id="kpi-estado-global">
                 <div class="kpi-icon">!</div>
                 <div class="kpi-info">
-                    <span class="kpi-label">Estado General</span>
+                    <span class="kpi-label">Estado de la instalación</span>
                     <span class="kpi-valor estado-normal" id="val-estado-global">NORMAL</span>
-                    <span class="kpi-detalle" id="det-estado-global">0 alertas activas</span>
+                    <span class="kpi-detalle" id="det-estado-global">Sin ramas configuradas</span>
                 </div>
             </article>
         </div>
     </section>
 
     <main class="contenedor-principal">
-        <aside class="columna-izquierda" aria-label="Constructor de ramas y cargas">
+        <aside class="columna-izquierda" aria-label="Constructor de ramas y equipos">
             <div class="panel-ramas" id="panel-ramas">
                 <div class="mensaje-vacio" id="msg-vacio">
                     <svg viewBox="0 0 24 24" width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                        <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"></path>
                     </svg>
                     <h3>No hay ramas configuradas</h3>
-                    <p>Presiona <strong>"+ Nueva Rama"</strong> para comenzar a modelar tu instalacion electrica.</p>
+                    <p>Presiona <strong>"+ Nueva rama"</strong> o carga un escenario para comenzar a modelar la instalación eléctrica.</p>
                     <button id="btn-primera-rama" class="btn btn-principal">Crear primera rama</button>
                 </div>
             </div>
         </aside>
 
-        <aside class="columna-derecha" aria-label="Visualizacion y analisis">
+        <aside class="columna-derecha" aria-label="Visualización y análisis">
             <div class="tabs" role="tablist">
-                <button class="tab-btn active" role="tab" aria-selected="true" data-tab="diagrama">Diagrama Electrico</button>
-                <button class="tab-btn" role="tab" aria-selected="false" data-tab="diagnostico">Diagnostico</button>
-                <button class="tab-btn" role="tab" aria-selected="false" data-tab="matematicas">Calculos Matematicos</button>
+                <button class="tab-btn active" role="tab" aria-selected="true" data-tab="diagrama">Diagrama eléctrico</button>
+                <button class="tab-btn" role="tab" aria-selected="false" data-tab="diagnostico">Diagnóstico</button>
+                <button class="tab-btn" role="tab" aria-selected="false" data-tab="matematicas">Cálculos matemáticos</button>
             </div>
 
             <div class="tab-panel active" id="panel-diagrama" role="tabpanel">
+                <h3 class="titulo-impresion">Diagrama eléctrico</h3>
                 <div class="contenedor-svg" id="contenedor-svg">
-                    <svg id="svg-diagrama" viewBox="0 0 800 500" preserveAspectRatio="xMidYMid meet" aria-label="Diagrama unifilar de la instalacion electrica"></svg>
-                    <div class="leyenda-diagrama" id="leyenda-diagrama"></div>
+                    <svg id="svg-diagrama" viewBox="0 0 900 500" aria-label="Diagrama unifilar de la instalación eléctrica"></svg>
+                    <div class="zoom-controles" role="group" aria-label="Zoom del diagrama">
+                        <button type="button" id="btn-zoom-menos" title="Alejar" aria-label="Alejar">−</button>
+                        <span class="zoom-nivel" id="zoom-nivel">100 %</span>
+                        <button type="button" id="btn-zoom-mas" title="Acercar" aria-label="Acercar">+</button>
+                        <button type="button" id="btn-zoom-reset" title="Ver todo el diagrama (doble clic)" aria-label="Restablecer zoom">⤢</button>
+                    </div>
                 </div>
+                <div class="leyenda-diagrama" id="leyenda-diagrama"></div>
             </div>
 
             <div class="tab-panel" id="panel-diagnostico" role="tabpanel">
-                <div class="panel-diagnostico" id="panel-diagnostico-contenido">
-                    <div class="diagnostico-vacio">
-                        <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <path d="M12 16v-4"></path>
-                            <path d="M12 8h.01"></path>
-                        </svg>
-                        <h4>Sin analisis disponible</h4>
-                        <p>Configura al menos una rama con cargas para ver el diagnostico.</p>
-                    </div>
-                </div>
+                <h3 class="titulo-impresion">Diagnóstico</h3>
+                <div class="panel-diagnostico" id="panel-diagnostico-contenido"></div>
             </div>
 
             <div class="tab-panel" id="panel-matematicas" role="tabpanel">
+                <h3 class="titulo-impresion">Cálculos matemáticos</h3>
                 <div class="panel-matematicas" id="panel-matematicas-contenido">
                     <div class="selector-rama-matematicas">
-                        <label for="sel-rama-matematicas">Seleccionar rama para ver detalle:</label>
-                        <select id="sel-rama-matematicas" disabled>
-                            <option value="">— Selecciona una rama —</option>
-                        </select>
+                        <label for="sel-rama-matematicas">Ver el desarrollo de:</label>
+                        <select id="sel-rama-matematicas" disabled></select>
                     </div>
-                    <div class="matematicas-contenido" id="matematicas-contenido">
-                        <div class="matematicas-vacio">
-                            <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M9 18V5l12-2v13"></path>
-                                <circle cx="6" cy="18" r="3"></circle>
-                                <circle cx="18" cy="16" r="3"></circle>
-                            </svg>
-                            <h4>Selecciona una rama</h4>
-                            <p>Elige una rama del selector para ver el desarrollo paso a paso de las formulas de Ohm, Kirchhoff y Potencia con sus valores numericos.</p>
-                        </div>
-                    </div>
+                    <div class="matematicas-contenido" id="matematicas-contenido"></div>
                 </div>
             </div>
         </aside>
@@ -165,76 +164,68 @@
     <dialog id="modal-formulas" class="modal-formulas">
         <div class="modal-contenido">
             <header class="modal-header">
-                <h2>Formulas y Metodo de Calculo</h2>
-                <button class="btn-cerrar" id="btn-cerrar-formulas" aria-label="Cerrar">x</button>
+                <h2>Fórmulas y método de cálculo</h2>
+                <button class="btn-cerrar" id="btn-cerrar-formulas" aria-label="Cerrar">×</button>
             </header>
             <div class="modal-cuerpo">
                 <section class="formula-seccion">
-                    <h3>1. Resistencia del Conductor (Ida y Vuelta)</h3>
-                    <div class="formula-box">
-                        R_cable = rho * (2 * L) / A
-                        rho = 0.0172 ohm·mm2/m (cobre a 20°C) • L = largo en metros • A = seccion en mm2
-                    </div>
-                    <p>Si hay extension: <strong>R_total = R_rama + R_extension</strong></p>
+                    <h3>1. Resistencia del conductor (ida y vuelta)</h3>
+                    <div class="formula-box">R_cable = ρ · (2 · L) / A
+ρ = 0.0172 Ω·mm²/m (cobre a 20 °C) · L = largo en metros · A = sección en mm²</div>
+                    <p>Si hay extensión: <strong>R_cable_total = R_rama + R_extensión</strong></p>
                 </section>
 
                 <section class="formula-seccion">
-                    <h3>2. Resistencia Equivalente de Cargas en Paralelo</h3>
-                    <div class="formula-box">
-                        R_equipo = Vf^2 / P_nominal
-                        1/R_cargas = Sum (c_j / R_equipo,j)
-                    </div>
+                    <h3>2. Resistencia equivalente de los equipos en paralelo</h3>
+                    <div class="formula-box">R_equipo = V_f² / P_nominal
+1 / R_cargas = Σ (c_j / R_equipo,j)      (c_j = cantidad del equipo j)</div>
                 </section>
 
                 <section class="formula-seccion">
-                    <h3>3. Ley de Ohm en la Rama</h3>
-                    <div class="formula-box">
-                        R_total = R_cable + R_cargas
-                        I_rama = Vf / R_total
-                    </div>
+                    <h3>3. Ley de Ohm en la rama</h3>
+                    <div class="formula-box">R_total = R_cable_total + R_cargas
+I_rama = V_f / R_total</div>
                 </section>
 
                 <section class="formula-seccion">
-                    <h3>4. 2da Ley de Kirchhoff (Malla) - Caida de Voltaje</h3>
-                    <div class="formula-box">
-                        dV_cable = I_rama * R_cable
-                        V_carga = Vf - dV_cable
-                        dV% = (dV_cable / Vf) * 100
-                    </div>
-                    <p>Verificacion: Vf - dV_cable - V_carga = 0</p>
+                    <h3>4. 2da ley de Kirchhoff (malla): caída de voltaje</h3>
+                    <div class="formula-box">ΔV_cable = I_rama · R_cable_total
+V_carga = V_f − ΔV_cable
+ΔV % = (ΔV_cable / V_f) · 100</div>
+                    <p>Comprobación de la malla: V_f − ΔV_cable − V_carga = 0</p>
                 </section>
 
                 <section class="formula-seccion">
-                    <h3>5. 1ra Ley de Kirchhoff (Nodos)</h3>
-                    <div class="formula-box">
-                        Nodo Rama: Sum (c_j * I_equipo,j) = I_rama
-                        Nodo Tablero: I_total = Sum I_rama,k
-                    </div>
+                    <h3>5. 1ra ley de Kirchhoff (nodos)</h3>
+                    <div class="formula-box">Nodo de la rama:   Σ (c_j · I_equipo,j) = I_rama
+Nodo del tablero:  I_total = Σ I_rama,k</div>
                 </section>
 
                 <section class="formula-seccion">
-                    <h3>6. Ecuaciones de Potencia</h3>
-                    <div class="formula-box">
-                        P_carga = V_carga * I_rama (Potencia util)
-                        P_perdida = I_rama^2 * R_cable = dV_cable * I_rama (Calor/Joule)
-                        P_total = Vf * I_total = Sum (P_carga + P_perdida)
-                    </div>
+                    <h3>6. Ecuaciones de potencia</h3>
+                    <div class="formula-box">P_carga = V_carga · I_rama              (potencia útil)
+P_pérdida = I_rama² · R_cable_total     (calor, efecto Joule)
+P_fuente = V_f · I_total = Σ (P_carga + P_pérdida)</div>
                 </section>
 
                 <section class="formula-seccion">
-                    <h3>7. Criterios de Alerta (SEC RIC Nº 10)</h3>
+                    <h3>7. Criterios de alerta</h3>
                     <table class="tabla-alertas">
                         <thead>
-                            <tr><th>Condicion</th><th>Estado</th><th>Accion</th></tr>
+                            <tr><th>Condición</th><th>Estado</th><th>Significado</th></tr>
                         </thead>
                         <tbody>
-                            <tr class="peligro"><td>I > I_prot o I > I_cable</td><td>PELIGRO</td><td>Disparo automatico / Riesgo incendio</td></tr>
-                            <tr class="peligro"><td>dV% > 5%</td><td>PELIGRO</td><td>Daño a equipos / Mal funcionamiento</td></tr>
-                            <tr class="advertencia"><td>I >= 80% min(I_prot, I_cable)</td><td>ADVERTENCIA</td><td>Cerca del limite, no agregar cargas</td></tr>
-                            <tr class="advertencia"><td>3% < dV% <= 5%</td><td>ADVERTENCIA</td><td>Aumentar seccion o acortar distancia</td></tr>
-                            <tr class="normal"><td>I < 80% y dV% <= 3%</td><td>NORMAL</td><td>Operacion segura</td></tr>
+                            <tr class="peligro"><td>I_rama &gt; I_automático</td><td>PELIGRO</td><td>Se dispara el automático</td></tr>
+                            <tr class="peligro"><td>I_rama &gt; I_cable o I_rama &gt; I_extensión</td><td>PELIGRO</td><td>Sobrecalentamiento del conductor, riesgo de incendio</td></tr>
+                            <tr class="peligro"><td>I_automático &gt; I_cable</td><td>PELIGRO</td><td>El automático no protege al cable</td></tr>
+                            <tr class="peligro"><td>ΔV % &gt; límite de peligro (5 %)</td><td>PELIGRO</td><td>Daño o mal funcionamiento de los equipos</td></tr>
+                            <tr class="advertencia"><td>I_rama ≥ 80 % del menor límite de corriente</td><td>ADVERTENCIA</td><td>Cerca del límite, no agregar equipos</td></tr>
+                            <tr class="advertencia"><td>Límite de advertencia (3 %) &lt; ΔV % ≤ 5 %</td><td>ADVERTENCIA</td><td>Aumentar sección o acortar el tramo</td></tr>
+                            <tr class="advertencia"><td>I_automático &gt; I_extensión</td><td>ADVERTENCIA</td><td>El automático no protege la extensión</td></tr>
+                            <tr class="normal"><td>Todo bajo el 80 % y ΔV % ≤ 3 %</td><td>NORMAL</td><td>Operación segura</td></tr>
                         </tbody>
                     </table>
+                    <p>Ampacidades referenciales de conductores de cobre; los límites de 3 % y 5 % de caída de voltaje se pueden cambiar en los parámetros generales.</p>
                 </section>
             </div>
         </div>
@@ -242,13 +233,39 @@
 
     <dialog id="modal-confirmar" class="modal-confirmar">
         <div class="modal-contenido modal-pequeno">
-            <h3>Reiniciar simulador?</h3>
-            <p>Se perderan todas las ramas y configuraciones actuales. ¿Continuar?</p>
+            <h3>¿Reiniciar el simulador?</h3>
+            <p>Se perderán todas las ramas y configuraciones actuales.</p>
             <div class="modal-acciones">
                 <button class="btn btn-secundario" id="btn-cancelar-reinicio">Cancelar</button>
-                <button class="btn btn-peligro" id="btn-confirmar-reinicio">Si, reiniciar</button>
+                <button class="btn btn-peligro" id="btn-confirmar-reinicio">Sí, reiniciar</button>
             </div>
         </div>
+    </dialog>
+
+    <dialog id="modal-equipo" class="modal-equipo">
+        <form id="form-equipo" class="form-equipo" method="dialog" novalidate>
+            <h3>Equipo personalizado</h3>
+            <p class="form-sub" id="equipo-rama">Se agregará a la rama</p>
+            <div class="campo">
+                <label for="eq-nombre">Nombre del equipo</label>
+                <input type="text" id="eq-nombre" required maxlength="40" placeholder="Ej.: Soldadora, estufa, bomba de agua" autocomplete="off">
+            </div>
+            <div class="form-fila">
+                <div class="campo">
+                    <label for="eq-potencia">Potencia (W)</label>
+                    <input type="number" id="eq-potencia" required min="1" max="10000" step="1" placeholder="1 a 10000">
+                </div>
+                <div class="campo">
+                    <label for="eq-cantidad">Cantidad</label>
+                    <input type="number" id="eq-cantidad" required min="1" max="50" step="1" value="1">
+                </div>
+            </div>
+            <div class="form-estimacion" id="eq-estimacion" aria-live="polite">Ingresa la potencia para estimar la corriente.</div>
+            <div class="modal-acciones">
+                <button type="button" class="btn btn-secundario" id="btn-cancelar-equipo">Cancelar</button>
+                <button type="submit" class="btn btn-principal" id="btn-guardar-equipo">Agregar equipo</button>
+            </div>
+        </form>
     </dialog>
 
     <script defer src="js/catalog.js"></script>
